@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShorURL - Сокращение ссылок с аналитикой</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-link"></i> ShorURL</h1>
+            <p>Сокращайте ссылки и отслеживайте аналитику</p>
+        </header>
+
+        <main>
+            <!-- URL Shortening Form -->
+            <div class="card">
+                <h2>Сократить ссылку</h2>
+                <form id="shortenForm">
+                    <div class="input-group">
+                        <label for="originalUrl">Введите ссылку для сокращения:</label>
+                        <input type="url" id="originalUrl" placeholder="https://example.com/very-long-url" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="tags">Теги (через запятую, необязательно):</label>
+                        <input type="text" id="tags" placeholder="маркетинг, социальные сети, реклама">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-compress-alt"></i> Сократить ссылку
+                    </button>
+                </form>
+
+                <!-- Result -->
+                <div id="result" class="result hidden">
+                    <h3>Ссылка успешно сокращена!</h3>
+                    <div class="url-result">
+                        <input type="text" id="shortUrl" readonly>
+                        <button class="btn btn-secondary" onclick="copyToClipboard()">
+                            <i class="fas fa-copy"></i> Копировать
+                        </button>
+                    </div>
+                    <p class="original-url">Оригинальная ссылка: <span id="originalUrlDisplay"></span></p>
+                    <div id="tagsDisplay" class="tags-display hidden">
+                        <span>Теги: </span>
+                        <div id="tagsList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My URLs -->
+            <div class="card">
+                <h2>Мои ссылки</h2>
+                <button class="btn btn-secondary" onclick="loadMyUrls()">
+                    <i class="fas fa-refresh"></i> Обновить список
+                </button>
+                <div id="myUrls" class="urls-list">
+                    <p class="no-urls">Нажмите "Обновить список" чтобы увидеть ваши ссылки</p>
+                </div>
+            </div>
+
+            <!-- Analytics -->
+            <div id="analyticsSection" class="card hidden">
+                <h2>Аналитика</h2>
+                <div id="analyticsContent"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+    
+    <!-- Toast notifications -->
+    <div id="toast" class="toast hidden">
+        <div class="toast-content">
+            <span id="toastMessage"></span>
+            <button onclick="closeToast()" class="toast-close">&times;</button>
+        </div>
+    </div>
+</body>
+</html> 
