@@ -1,5 +1,7 @@
 // Global variables
 let currentShortCode = null;
+let currentUser = null;
+let editingUrl = null;
 
 // DOM elements
 const shortenForm = document.getElementById('shortenForm');
@@ -14,8 +16,94 @@ const analyticsContent = document.getElementById('analyticsContent');
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
+    const savedUser = localStorage.getItem('shorurl_user');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        updateUserInterface();
+    }
+    
     shortenForm.addEventListener('submit', handleShortenForm);
+    document.getElementById('editForm').addEventListener('submit', handleEditForm);
+    
+    // Enter key handler for password input
+    document.getElementById('userPassword').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            login();
+        }
+    });
 });
+
+// Authentication functions
+async function login() {
+    const password = document.getElementById('userPassword').value;
+    
+    if (!password || password.length < 4) {
+        showToast('Пароль должен быть не менее 4 символов', 'error');
+        return;
+    }
+    
+    try {
+        showLoading(true);
+        
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ password })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            currentUser = { userId: data.userId, password };
+            localStorage.setItem('shorurl_user', JSON.stringify(currentUser));
+            updateUserInterface();
+            showToast(data.message, 'success');
+            
+            // Clear password input
+            document.getElementById('userPassword').value = '';
+            
+            // Auto-load user URLs
+            loadMyUrls();
+        } else {
+            showToast(data.error || 'Ошибка входа', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Ошибка при входе', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+function logout() {
+    currentUser = null;
+    localStorage.removeItem('shorurl_user');
+    updateUserInterface();
+    showToast('Вы вышли из аккаунта', 'success');
+    
+    // Clear URLs list
+    document.getElementById('myUrls').innerHTML = '<p class="no-urls">Войдите в аккаунт, чтобы увидеть ваши ссылки</p>';
+}
+
+function updateUserInterface() {
+    const loginSection = document.getElementById('loginSection');
+    const loggedInSection = document.getElementById('loggedInSection');
+    const userInfo = document.getElementById('userInfo');
+    const loginHint = document.getElementById('loginHint');
+    
+    if (currentUser) {
+        loginSection.classList.add('hidden');
+        loggedInSection.classList.remove('hidden');
+        userInfo.textContent = `Пользователь: ${currentUser.userId.replace('user_', '').substring(0, 8)}...`;
+        loginHint.classList.add('hidden');
+    } else {
+        loginSection.classList.remove('hidden');
+        loggedInSection.classList.add('hidden');
+        loginHint.classList.remove('hidden');
+    }
+}
 
 // Handle form submission
 async function handleShortenForm(e) {
@@ -39,7 +127,8 @@ async function handleShortenForm(e) {
             },
             body: JSON.stringify({
                 url: originalUrl,
-                tags: tags
+                tags: tags,
+                userId: currentUser ? currentUser.userId : null
             })
         });
         
@@ -99,7 +188,11 @@ async function loadMyUrls() {
     try {
         showLoading(true);
         
-        const response = await fetch('/api/my-urls');
+        const url = currentUser 
+            ? `/api/my-urls?userId=${currentUser.userId}`
+            : '/api/my-urls';
+            
+        const response = await fetch(url);
         const urls = await response.json();
         
         if (urls.length === 0) {
@@ -124,6 +217,7 @@ function displayUrls(urls) {
             : '';
         
         const createdDate = new Date(url.created_at).toLocaleDateString('ru-RU');
+        const updatedDate = url.updated_at ? new Date(url.updated_at).toLocaleDateString('ru-RU') : null;
         
         return `
             <div class="url-item">
@@ -138,6 +232,10 @@ function displayUrls(urls) {
                             <i class="fas fa-calendar"></i>
                             <span>${createdDate}</span>
                         </div>
+                        ${updatedDate ? `<div class="stat-item">
+                            <i class="fas fa-edit"></i>
+                            <span>изм. ${updatedDate}</span>
+                        </div>` : ''}
                     </div>
                 </div>
                 <div class="url-original">→ ${url.original_url}</div>
@@ -149,12 +247,78 @@ function displayUrls(urls) {
                     <button class="btn btn-secondary" onclick="showAnalytics('${url.short_code}')">
                         <i class="fas fa-chart-bar"></i> Аналитика
                     </button>
+                    ${currentUser ? `<button class="btn btn-edit" onclick="editUrl('${url.short_code}', '${url.original_url.replace(/'/g, "&apos;")}', '${url.tags ? url.tags.join(', ') : ''}')">
+                        <i class="fas fa-edit"></i> Редактировать
+                    </button>` : ''}
                 </div>
             </div>
         `;
     }).join('');
     
     myUrlsDiv.innerHTML = urlsHtml;
+}
+
+// Edit URL functions
+function editUrl(shortCode, originalUrl, tags) {
+    editingUrl = { shortCode, originalUrl, tags };
+    
+    document.getElementById('editOriginalUrl').value = originalUrl;
+    document.getElementById('editTags').value = tags;
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+    editingUrl = null;
+    document.getElementById('editModal').classList.add('hidden');
+    document.getElementById('editForm').reset();
+}
+
+async function handleEditForm(e) {
+    e.preventDefault();
+    
+    if (!editingUrl || !currentUser) {
+        showToast('Ошибка: нет данных для редактирования', 'error');
+        return;
+    }
+    
+    const originalUrl = document.getElementById('editOriginalUrl').value;
+    const tagsInput = document.getElementById('editTags').value;
+    
+    // Parse tags
+    const tags = tagsInput.trim() 
+        ? tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag)
+        : [];
+    
+    try {
+        showLoading(true);
+        
+        const response = await fetch(`/api/url/${editingUrl.shortCode}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                originalUrl,
+                tags,
+                userId: currentUser.userId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('Ссылка успешно обновлена!', 'success');
+            closeEditModal();
+            loadMyUrls(); // Refresh the list
+        } else {
+            showToast(data.error || 'Ошибка при обновлении ссылки', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Ошибка при обновлении ссылки', 'error');
+    } finally {
+        showLoading(false);
+    }
 }
 
 // Copy URL to clipboard
@@ -198,165 +362,153 @@ function displayAnalytics(data) {
     const shortUrl = `${window.location.origin}/${url.short_code}`;
     
     // Countries list
-    const countriesHtml = Object.entries(analytics.countries)
-        .sort(([,a], [,b]) => b - a)
-        .map(([country, count]) => `
-            <div class="country-item">
-                <span>${country}</span>
-                <span>${count} кликов</span>
-            </div>
-        `).join('');
+    const countriesList = Object.entries(analytics.countries)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([country, count]) => `<li class="country-item"><span>${country}</span><span>${count}</span></li>`)
+        .join('');
+    
+    // Browsers list
+    const browsersList = Object.entries(analytics.browsers)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([browser, count]) => `<li class="country-item"><span>${browser}</span><span>${count}</span></li>`)
+        .join('');
+    
+    // Devices list
+    const devicesList = Object.entries(analytics.devices)
+        .sort((a, b) => b[1] - a[1])
+        .map(([device, count]) => `<li class="country-item"><span>${device}</span><span>${count}</span></li>`)
+        .join('');
+    
+    // OS list
+    const osList = Object.entries(analytics.operatingSystems)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([os, count]) => `<li class="country-item"><span>${os}</span><span>${count}</span></li>`)
+        .join('');
     
     // Recent clicks
-    const recentClicksHtml = analytics.recentClicks.map(click => {
-        const clickDate = new Date(click.clicked_at).toLocaleString('ru-RU');
-        return `
-            <div class="click-item">
-                <div>
-                    <div class="click-location">${click.city}, ${click.country}</div>
-                    <div style="font-size: 12px; color: #4a5568; margin-top: 2px;">
-                        ${click.browser || 'Неизвестно'} • ${click.os || 'Неизвестно'} • ${click.device_type || 'Неизвестно'}
+    const recentClicksHtml = analytics.recentClicks
+        .slice(0, 10)
+        .map(click => {
+            const clickDate = new Date(click.clicked_at);
+            const timeAgo = getTimeAgo(clickDate);
+            
+            return `
+                <div class="click-item">
+                    <div>
+                        <div class="click-location">${click.country}, ${click.city}</div>
+                        <div style="font-size: 12px; color: #666;">
+                            ${click.browser} • ${click.os} • ${click.device_type}
+                        </div>
                     </div>
-                    ${click.referer ? `<div style="font-size: 12px; color: #718096;">От: ${click.referer}</div>` : ''}
+                    <div class="click-time">${timeAgo}</div>
                 </div>
-                <div class="click-time">${clickDate}</div>
-            </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
     
-    // Tags
-    const tagsHtml = url.tags && url.tags.length > 0 
-        ? `<div style="margin-bottom: 15px;">${url.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>`
-        : '';
-    
-    const createdDate = new Date(url.created_at).toLocaleString('ru-RU');
-    
-    analyticsContent.innerHTML = `
-        <div style="margin-bottom: 30px; padding: 20px; background: #f7fafc; border-radius: 10px;">
-            <h3 style="color: #4a5568; margin-bottom: 10px;">
-                <a href="${shortUrl}" target="_blank" style="color: #667eea; text-decoration: none;">${shortUrl}</a>
-            </h3>
-            <p style="color: #718096; word-break: break-all; margin-bottom: 10px;">→ ${url.original_url}</p>
-            ${tagsHtml}
-            <p style="color: #718096; font-size: 14px;">Создана: ${createdDate}</p>
+    document.getElementById('analyticsContent').innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin-bottom: 10px;">Аналитика для: <a href="${shortUrl}" target="_blank">${shortUrl}</a></h3>
+            <p style="color: #666; word-break: break-all;">→ ${url.original_url}</p>
+            ${url.tags && url.tags.length > 0 ? `
+                <div style="margin-top: 10px;">
+                    ${url.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                </div>
+            ` : ''}
         </div>
         
         <div class="analytics-grid">
             <div class="analytics-card">
-                <h4>Всего кликов</h4>
+                <h4>Общая статистика</h4>
                 <div class="stat-number">${analytics.totalClicks}</div>
+                <p>Всего кликов</p>
             </div>
             
             <div class="analytics-card">
-                <h4>Уникальных стран</h4>
-                <div class="stat-number">${Object.keys(analytics.countries).length}</div>
-            </div>
-            
-            <div class="analytics-card">
-                <h4>Клики по странам</h4>
-                <div class="country-list">
-                    ${countriesHtml || '<p style="color: #718096; font-style: italic;">Пока нет данных</p>'}
-                </div>
+                <h4>Топ страны</h4>
+                <ul class="country-list">${countriesList || '<li>Нет данных</li>'}</ul>
             </div>
             
             <div class="analytics-card">
                 <h4>Браузеры</h4>
-                <div class="country-list">
-                    ${analytics.browsers ? Object.entries(analytics.browsers)
-                        .sort(([,a], [,b]) => b - a)
-                        .map(([browser, count]) => `
-                            <div class="country-item">
-                                <span>${browser}</span>
-                                <span>${count} кликов</span>
-                            </div>
-                        `).join('') : '<p style="color: #718096; font-style: italic;">Пока нет данных</p>'}
-                </div>
+                <ul class="country-list">${browsersList || '<li>Нет данных</li>'}</ul>
             </div>
             
             <div class="analytics-card">
                 <h4>Устройства</h4>
-                <div class="country-list">
-                    ${analytics.devices ? Object.entries(analytics.devices)
-                        .sort(([,a], [,b]) => b - a)
-                        .map(([device, count]) => `
-                            <div class="country-item">
-                                <span>${device}</span>
-                                <span>${count} кликов</span>
-                            </div>
-                        `).join('') : '<p style="color: #718096; font-style: italic;">Пока нет данных</p>'}
-                </div>
+                <ul class="country-list">${devicesList || '<li>Нет данных</li>'}</ul>
             </div>
             
             <div class="analytics-card">
                 <h4>Операционные системы</h4>
-                <div class="country-list">
-                    ${analytics.operatingSystems ? Object.entries(analytics.operatingSystems)
-                        .sort(([,a], [,b]) => b - a)
-                        .map(([os, count]) => `
-                            <div class="country-item">
-                                <span>${os}</span>
-                                <span>${count} кликов</span>
-                            </div>
-                        `).join('') : '<p style="color: #718096; font-style: italic;">Пока нет данных</p>'}
-                </div>
-            </div>
-            
-            <div class="analytics-card">
-                <h4>Последние клики</h4>
-                <div class="recent-clicks">
-                    ${recentClicksHtml || '<p style="color: #718096; font-style: italic;">Пока нет кликов</p>'}
-                </div>
+                <ul class="country-list">${osList || '<li>Нет данных</li>'}</ul>
             </div>
         </div>
+        
+        ${analytics.recentClicks.length > 0 ? `
+            <div class="recent-clicks">
+                <h4>Последние переходы</h4>
+                ${recentClicksHtml}
+            </div>
+        ` : ''}
     `;
 }
 
-// Show loading state
-function showLoading(show) {
-    if (show) {
-        document.body.style.cursor = 'wait';
+// Helper function to get time ago
+function getTimeAgo(date) {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) {
+        return 'Только что';
+    } else if (diffInSeconds < 3600) {
+        const minutes = Math.floor(diffInSeconds / 60);
+        return `${minutes} мин назад`;
+    } else if (diffInSeconds < 86400) {
+        const hours = Math.floor(diffInSeconds / 3600);
+        return `${hours} ч назад`;
     } else {
-        document.body.style.cursor = 'default';
+        const days = Math.floor(diffInSeconds / 86400);
+        return `${days} дн назад`;
     }
 }
 
-// Show toast notification
+// Loading and UI helpers
+function showLoading(show) {
+    const buttons = document.querySelectorAll('button');
+    const forms = document.querySelectorAll('form');
+    
+    buttons.forEach(btn => {
+        btn.disabled = show;
+    });
+    
+    if (show) {
+        document.body.classList.add('loading');
+    } else {
+        document.body.classList.remove('loading');
+    }
+}
+
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     const toastMessage = document.getElementById('toastMessage');
     
     toastMessage.textContent = message;
     toast.className = `toast ${type}`;
-    
-    // Hide any existing timeout
-    if (window.toastTimeout) {
-        clearTimeout(window.toastTimeout);
-    }
-    
-    // Show toast
     toast.classList.remove('hidden');
     
-    // Auto hide after 4 seconds
-    window.toastTimeout = setTimeout(() => {
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
         closeToast();
-    }, 4000);
+    }, 5000);
 }
 
-// Close toast notification
 function closeToast() {
     const toast = document.getElementById('toast');
     toast.classList.add('hidden');
-    
-    if (window.toastTimeout) {
-        clearTimeout(window.toastTimeout);
-    }
 }
-
-// Auto-load user URLs on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // You can uncomment this if you want to auto-load user URLs
-    // loadMyUrls();
-});
 
 // Handle keyboard shortcuts
 document.addEventListener('keydown', function(e) {
