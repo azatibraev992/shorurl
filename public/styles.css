@@ -1015,6 +1015,35 @@ header p {
     margin-right: 5px;
 }
 
+/* Clicks Controls */
+.clicks-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9ff;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.clicks-info {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+}
+
+.clicks-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-small {
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+}
+
 /* Analytics Footer */
 .analytics-footer {
     display: flex;

@@ -252,6 +252,24 @@ app.get('/:shortCode', (req, res) => {
   });
 });
 
+// Get all clicks for a specific URL
+app.get('/api/analytics/:shortCode/all-clicks', (req, res) => {
+  const shortCode = req.params.shortCode;
+
+  // Get all clicks for this URL
+  db.all('SELECT * FROM clicks WHERE short_code = ? ORDER BY clicked_at DESC', [shortCode], (err, clicks) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Ошибка получения данных' });
+    }
+
+    res.json({
+      success: true,
+      clicks: clicks
+    });
+  });
+});
+
 // Get analytics for a short code
 app.get('/api/analytics/:shortCode', (req, res) => {
   const shortCode = req.params.shortCode;

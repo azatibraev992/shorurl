@@ -340,6 +340,8 @@ async function showAnalytics(shortCode) {
         const data = await response.json();
         
         if (response.ok) {
+            currentClicksData = data.analytics.recentClicks; // Сохраняем данные кликов
+            currentClicksOffset = 10; // Сбрасываем offset
             displayAnalytics(data);
             analyticsSection.classList.remove('hidden');
             
@@ -668,9 +670,61 @@ function displayAnalytics(data) {
 
         ${analytics.recentClicks.length > 0 ? `
             <div class="recent-clicks-detailed">
-                <h4><i class="fas fa-history"></i> Последние переходы</h4>
-                <div class="clicks-list">
-                    ${recentClicksHtml}
+                <h4><i class="fas fa-history"></i> История переходов</h4>
+                <div class="clicks-controls">
+                    <div class="clicks-info">
+                        <span>Показано: <span id="clicksShown">${Math.min(analytics.recentClicks.length, 10)}</span> из ${analytics.recentClicks.length}</span>
+                    </div>
+                    <div class="clicks-actions">
+                        <button class="btn btn-secondary btn-small" onclick="loadMoreClicks('${url.short_code}')">
+                            <i class="fas fa-plus"></i> Показать больше
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="loadAllClicks('${url.short_code}')">
+                            <i class="fas fa-list"></i> Показать все
+                        </button>
+                    </div>
+                </div>
+                <div class="clicks-list" id="clicksList">
+                    ${analytics.recentClicks.slice(0, 10).map(click => {
+                        const clickDate = new Date(click.clicked_at);
+                        const timeAgo = getTimeAgo(clickDate);
+                        let refererDisplay = 'Прямой переход';
+                        if (click.referer && click.referer !== '') {
+                            try {
+                                refererDisplay = new URL(click.referer).hostname.replace('www.', '');
+                            } catch (e) {
+                                refererDisplay = 'Неизвестный источник';
+                            }
+                        }
+                        
+                        return `
+                            <div class="click-item-detailed">
+                                <div class="click-main">
+                                    <div class="click-location">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        ${click.country}${click.region !== 'Неизвестно' ? `, ${click.region}` : ''}${click.city !== 'Неизвестно' ? `, ${click.city}` : ''}
+                                    </div>
+                                    <div class="click-tech">
+                                        <span><i class="fas fa-globe"></i> ${click.browser}</span>
+                                        <span><i class="fas fa-desktop"></i> ${click.os}</span>
+                                        <span><i class="fas fa-mobile-alt"></i> ${click.device_type}</span>
+                                    </div>
+                                    <div class="click-source">
+                                        <i class="fas fa-external-link-alt"></i>
+                                        Источник: ${refererDisplay}
+                                    </div>
+                                    <div class="click-ip">
+                                        <i class="fas fa-network-wired"></i>
+                                        IP: ${click.ip_address}
+                                    </div>
+                                </div>
+                                <div class="click-time">
+                                    <i class="fas fa-clock"></i>
+                                    ${timeAgo}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         ` : ''}
@@ -703,6 +757,148 @@ function closeAnalytics() {
     analyticsSection.classList.add('hidden');
 }
 
+// Load more clicks
+let currentClicksData = null;
+let currentClicksOffset = 10;
+
+async function loadMoreClicks(shortCode) {
+    if (!currentClicksData) return;
+    
+    const clicksList = document.getElementById('clicksList');
+    const clicksShown = document.getElementById('clicksShown');
+    
+    const nextBatch = currentClicksData.slice(currentClicksOffset, currentClicksOffset + 10);
+    
+    nextBatch.forEach(click => {
+        const clickDate = new Date(click.clicked_at);
+        const timeAgo = getTimeAgo(clickDate);
+        let refererDisplay = 'Прямой переход';
+        if (click.referer && click.referer !== '') {
+            try {
+                refererDisplay = new URL(click.referer).hostname.replace('www.', '');
+            } catch (e) {
+                refererDisplay = 'Неизвестный источник';
+            }
+        }
+        
+        const clickElement = document.createElement('div');
+        clickElement.className = 'click-item-detailed';
+        clickElement.innerHTML = `
+            <div class="click-main">
+                <div class="click-location">
+                    <i class="fas fa-map-marker-alt"></i>
+                    ${click.country}${click.region !== 'Неизвестно' ? `, ${click.region}` : ''}${click.city !== 'Неизвестно' ? `, ${click.city}` : ''}
+                </div>
+                <div class="click-tech">
+                    <span><i class="fas fa-globe"></i> ${click.browser}</span>
+                    <span><i class="fas fa-desktop"></i> ${click.os}</span>
+                    <span><i class="fas fa-mobile-alt"></i> ${click.device_type}</span>
+                </div>
+                <div class="click-source">
+                    <i class="fas fa-external-link-alt"></i>
+                    Источник: ${refererDisplay}
+                </div>
+                <div class="click-ip">
+                    <i class="fas fa-network-wired"></i>
+                    IP: ${click.ip_address}
+                </div>
+            </div>
+            <div class="click-time">
+                <i class="fas fa-clock"></i>
+                ${timeAgo}
+            </div>
+        `;
+        clicksList.appendChild(clickElement);
+    });
+    
+    currentClicksOffset += 10;
+    clicksShown.textContent = Math.min(currentClicksOffset, currentClicksData.length);
+    
+    if (currentClicksOffset >= currentClicksData.length) {
+        const loadMoreBtn = document.querySelector('button[onclick*="loadMoreClicks"]');
+        if (loadMoreBtn) {
+            loadMoreBtn.style.display = 'none';
+        }
+    }
+}
+
+async function loadAllClicks(shortCode) {
+    try {
+        showToast('Загружаем все переходы...', 'info');
+        
+        const response = await fetch(`/api/analytics/${shortCode}/all-clicks`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayAllClicks(data.clicks);
+            showToast('Все переходы загружены!', 'success');
+        } else {
+            showToast('Ошибка загрузки данных', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading all clicks:', error);
+        showToast('Ошибка при загрузке всех переходов', 'error');
+    }
+}
+
+function displayAllClicks(clicks) {
+    const clicksList = document.getElementById('clicksList');
+    const clicksShown = document.getElementById('clicksShown');
+    
+    // Clear current list
+    clicksList.innerHTML = '';
+    
+    // Add all clicks
+    clicks.forEach(click => {
+        const clickDate = new Date(click.clicked_at);
+        const timeAgo = getTimeAgo(clickDate);
+        let refererDisplay = 'Прямой переход';
+        if (click.referer && click.referer !== '') {
+            try {
+                refererDisplay = new URL(click.referer).hostname.replace('www.', '');
+            } catch (e) {
+                refererDisplay = 'Неизвестный источник';
+            }
+        }
+        
+        const clickElement = document.createElement('div');
+        clickElement.className = 'click-item-detailed';
+        clickElement.innerHTML = `
+            <div class="click-main">
+                <div class="click-location">
+                    <i class="fas fa-map-marker-alt"></i>
+                    ${click.country}${click.region !== 'Неизвестно' ? `, ${click.region}` : ''}${click.city !== 'Неизвестно' ? `, ${click.city}` : ''}
+                </div>
+                <div class="click-tech">
+                    <span><i class="fas fa-globe"></i> ${click.browser}</span>
+                    <span><i class="fas fa-desktop"></i> ${click.os}</span>
+                    <span><i class="fas fa-mobile-alt"></i> ${click.device_type}</span>
+                </div>
+                <div class="click-source">
+                    <i class="fas fa-external-link-alt"></i>
+                    Источник: ${refererDisplay}
+                </div>
+                <div class="click-ip">
+                    <i class="fas fa-network-wired"></i>
+                    IP: ${click.ip_address}
+                </div>
+            </div>
+            <div class="click-time">
+                <i class="fas fa-clock"></i>
+                ${timeAgo}
+            </div>
+        `;
+        clicksList.appendChild(clickElement);
+    });
+    
+    clicksShown.textContent = clicks.length;
+    
+    // Hide load more buttons
+    document.querySelectorAll('button[onclick*="loadMoreClicks"], button[onclick*="loadAllClicks"]').forEach(btn => {
+        btn.style.display = 'none';
+    });
+}
+
 // Export analytics data
 async function exportAnalytics(shortCode) {
     try {
@@ -726,8 +922,15 @@ async function exportAnalytics(shortCode) {
 
 // Generate PDF Report
 function generatePDFReport(data) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'mm', 'a4');
+    try {
+        console.log('Начинаем генерацию PDF...', data);
+        
+        if (!window.jspdf) {
+            throw new Error('jsPDF библиотека не загружена');
+        }
+        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
     
     // Colors
     const primaryColor = [102, 126, 234]; // #667eea
@@ -881,12 +1084,20 @@ function generatePDFReport(data) {
     currentY += 10;
     
     // Device breakdown
-    const deviceData = data.analytics.insights.deviceBreakdown;
+    const deviceData = data.analytics.technology.devices || {};
+    const totalClicks = data.analytics.summary.totalClicks;
+    const mobileClicks = deviceData['Mobile'] || 0;
+    const desktopClicks = deviceData['Desktop'] || 0;
+    const tabletClicks = deviceData['Tablet'] || 0;
+    const mobileShare = totalClicks > 0 ? ((mobileClicks / totalClicks) * 100).toFixed(1) : 0;
+    const desktopShare = totalClicks > 0 ? ((desktopClicks / totalClicks) * 100).toFixed(1) : 0;
+    const tabletShare = totalClicks > 0 ? ((tabletClicks / totalClicks) * 100).toFixed(1) : 0;
+    
     const deviceTable = [
         ['Тип устройства', 'Количество', '% от общего'],
-        ['🖥️ Компьютеры', deviceData.desktop.toString(), `${data.analytics.summary.desktopShare}%`],
-        ['📱 Мобильные', deviceData.mobile.toString(), `${data.analytics.summary.mobileShare}%`],
-        ['📱 Планшеты', deviceData.tablet.toString(), `${(100 - data.analytics.summary.desktopShare - data.analytics.summary.mobileShare).toFixed(1)}%`]
+        ['🖥️ Компьютеры', desktopClicks.toString(), `${desktopShare}%`],
+        ['📱 Мобильные', mobileClicks.toString(), `${mobileShare}%`],
+        ['📱 Планшеты', tabletClicks.toString(), `${tabletShare}%`]
     ];
     
     doc.autoTable({
@@ -1011,6 +1222,13 @@ function generatePDFReport(data) {
     // Save the PDF
     const fileName = `ShorURL_Analytics_${data.url.short_code}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
+    
+    console.log('PDF успешно создан:', fileName);
+    
+    } catch (error) {
+        console.error('Ошибка при создании PDF:', error);
+        showToast('Ошибка при создании PDF отчета: ' + error.message, 'error');
+    }
 }
 
 // Helper function to get time ago

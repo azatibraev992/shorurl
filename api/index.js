@@ -475,6 +475,25 @@ app.get('/:shortCode', async (req, res) => {
   }
 });
 
+// Get all clicks for a specific URL
+app.get('/api/analytics/:shortCode/all-clicks', async (req, res) => {
+  const shortCode = req.params.shortCode;
+
+  try {
+    // Get all clicks for this URL
+    const clicks = await redis.lrange(`clicks:${shortCode}`, 0, -1);
+    const parsedClicks = clicks.map(click => JSON.parse(click));
+
+    res.json({
+      success: true,
+      clicks: parsedClicks
+    });
+  } catch (error) {
+    console.error('Error fetching all clicks:', error);
+    res.status(500).json({ error: 'Ошибка получения данных' });
+  }
+});
+
 app.get('/api/analytics/:shortCode', async (req, res) => {
   try {
     const shortCode = req.params.shortCode;
