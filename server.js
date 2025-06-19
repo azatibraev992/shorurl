@@ -277,33 +277,92 @@ app.get('/api/analytics/:shortCode', (req, res) => {
       // Process analytics data
       const totalClicks = clicks.length;
       const countries = {};
+      const regions = {};
+      const cities = {};
       const browsers = {};
       const devices = {};
       const operatingSystems = {};
       const dailyClicks = {};
-      const recentClicks = clicks.slice(0, 10);
+      const hourlyClicks = {};
+      const weeklyClicks = {};
+      const referers = {};
+      const uniqueIPs = new Set();
+      const recentClicks = clicks.slice(0, 20);
+
+      // Calculate time-based analytics
+      const now = new Date();
+      const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const last7days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const last30days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      let clicksLast24h = 0;
+      let clicksLast7days = 0;
+      let clicksLast30days = 0;
 
       clicks.forEach(click => {
-        // Count by country
+        const clickDate = new Date(click.clicked_at);
+        
+        // Time-based counting
+        if (clickDate > last24h) clicksLast24h++;
+        if (clickDate > last7days) clicksLast7days++;
+        if (clickDate > last30days) clicksLast30days++;
+
+        // Unique IPs
+        uniqueIPs.add(click.ip_address);
+
+        // Geographic data
         const country = click.country || 'Неизвестно';
+        const region = click.region || 'Неизвестно';
+        const city = click.city || 'Неизвестно';
+        
         countries[country] = (countries[country] || 0) + 1;
+        regions[region] = (regions[region] || 0) + 1;
+        cities[city] = (cities[city] || 0) + 1;
 
-        // Count by browser
+        // Browser and device data
         const browser = click.browser || 'Неизвестно';
-        browsers[browser] = (browsers[browser] || 0) + 1;
-
-        // Count by device type
         const device = click.device_type || 'Неизвестно';
-        devices[device] = (devices[device] || 0) + 1;
-
-        // Count by OS
         const os = click.os || 'Неизвестно';
+        
+        browsers[browser] = (browsers[browser] || 0) + 1;
+        devices[device] = (devices[device] || 0) + 1;
         operatingSystems[os] = (operatingSystems[os] || 0) + 1;
 
-        // Count by day
+        // Referer data
+        const referer = click.referer || 'Прямой переход';
+        let refererDomain = 'Прямой переход';
+        if (click.referer && click.referer !== '') {
+          try {
+            refererDomain = new URL(click.referer).hostname;
+          } catch (e) {
+            refererDomain = 'Неизвестно';
+          }
+        }
+        referers[refererDomain] = (referers[refererDomain] || 0) + 1;
+
+        // Daily clicks
         const date = click.clicked_at.split(' ')[0];
         dailyClicks[date] = (dailyClicks[date] || 0) + 1;
+
+        // Hourly clicks (for last 7 days)
+        if (clickDate > last7days) {
+          const hour = clickDate.getHours();
+          hourlyClicks[hour] = (hourlyClicks[hour] || 0) + 1;
+        }
+
+        // Weekly clicks (by day of week)
+        const dayOfWeek = clickDate.getDay();
+        const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+        const dayName = days[dayOfWeek];
+        weeklyClicks[dayName] = (weeklyClicks[dayName] || 0) + 1;
       });
+
+      // Calculate peak hours
+      const peakHour = Object.entries(hourlyClicks).sort((a, b) => b[1] - a[1])[0];
+      const peakDay = Object.entries(weeklyClicks).sort((a, b) => b[1] - a[1])[0];
+
+      // Calculate click rate trends
+      const avgClicksPerDay = totalClicks > 0 ? (totalClicks / Math.max(1, Math.ceil((now - new Date(urlData.created_at)) / (1000 * 60 * 60 * 24)))) : 0;
 
       res.json({
         url: {
@@ -313,20 +372,42 @@ app.get('/api/analytics/:shortCode', (req, res) => {
           created_at: urlData.created_at
         },
         analytics: {
-          totalClicks,
-          countries,
-          browsers,
-          devices,
-          operatingSystems,
-          dailyClicks,
+          summary: {
+            totalClicks,
+            uniqueVisitors: uniqueIPs.size,
+            clicksLast24h,
+            clicksLast7days,
+            clicksLast30days,
+            avgClicksPerDay: Math.round(avgClicksPerDay * 100) / 100,
+            peakHour: peakHour ? `${peakHour[0]}:00 (${peakHour[1]} кликов)` : 'Нет данных',
+            peakDay: peakDay ? `${peakDay[0]} (${peakDay[1]} кликов)` : 'Нет данных'
+          },
+          geographic: {
+            countries,
+            regions,
+            cities
+          },
+          technology: {
+            browsers,
+            devices,
+            operatingSystems
+          },
+          traffic: {
+            referers,
+            dailyClicks,
+            hourlyClicks,
+            weeklyClicks
+          },
           recentClicks: recentClicks.map(click => ({
             country: click.country,
+            region: click.region,
             city: click.city,
             browser: click.browser,
             os: click.os,
             device_type: click.device_type,
             clicked_at: click.clicked_at,
-            referer: click.referer
+            referer: click.referer,
+            ip_address: click.ip_address ? click.ip_address.substring(0, click.ip_address.lastIndexOf('.')) + '.***' : 'N/A'
           }))
         }
       });

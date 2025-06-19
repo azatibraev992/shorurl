@@ -361,99 +361,284 @@ function displayAnalytics(data) {
     const { url, analytics } = data;
     const shortUrl = `${window.location.origin}/${url.short_code}`;
     
-    // Countries list
-    const countriesList = Object.entries(analytics.countries)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([country, count]) => `<li class="country-item"><span>${country}</span><span>${count}</span></li>`)
-        .join('');
-    
-    // Browsers list
-    const browsersList = Object.entries(analytics.browsers)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([browser, count]) => `<li class="country-item"><span>${browser}</span><span>${count}</span></li>`)
-        .join('');
-    
-    // Devices list
-    const devicesList = Object.entries(analytics.devices)
-        .sort((a, b) => b[1] - a[1])
-        .map(([device, count]) => `<li class="country-item"><span>${device}</span><span>${count}</span></li>`)
-        .join('');
-    
-    // OS list
-    const osList = Object.entries(analytics.operatingSystems)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([os, count]) => `<li class="country-item"><span>${os}</span><span>${count}</span></li>`)
-        .join('');
-    
-    // Recent clicks
-    const recentClicksHtml = analytics.recentClicks
-        .slice(0, 10)
-        .map(click => {
-            const clickDate = new Date(click.clicked_at);
-            const timeAgo = getTimeAgo(clickDate);
-            
-            return `
-                <div class="click-item">
-                    <div>
-                        <div class="click-location">${click.country}, ${click.city}</div>
-                        <div style="font-size: 12px; color: #666;">
-                            ${click.browser} • ${click.os} • ${click.device_type}
+    // Helper function to create lists
+    function createStatsList(data, limit = 10, showPercentage = true) {
+        const total = Object.values(data).reduce((sum, count) => sum + count, 0);
+        return Object.entries(data)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, limit)
+            .map(([key, count]) => {
+                const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                return `
+                    <li class="stat-item">
+                        <div class="stat-row">
+                            <span class="stat-label">${key}</span>
+                            <span class="stat-value">${count}${showPercentage ? ` (${percentage}%)` : ''}</span>
                         </div>
-                    </div>
-                    <div class="click-time">${timeAgo}</div>
+                        ${showPercentage ? `<div class="stat-bar"><div class="stat-fill" style="width: ${percentage}%"></div></div>` : ''}
+                    </li>
+                `;
+            })
+            .join('');
+    }
+
+    // Create hourly chart (simple text chart for now)
+    function createHourlyChart(hourlyData) {
+        const maxClicks = Math.max(...Object.values(hourlyData));
+        return Array.from({length: 24}, (_, hour) => {
+            const clicks = hourlyData[hour] || 0;
+            const percentage = maxClicks > 0 ? (clicks / maxClicks) * 100 : 0;
+            return `
+                <div class="hour-bar" title="${hour}:00 - ${clicks} кликов">
+                    <div class="hour-fill" style="height: ${percentage}%"></div>
+                    <span class="hour-label">${hour}</span>
                 </div>
             `;
         }).join('');
-    
+    }
+
+    // Create daily chart for last 30 days
+    function createDailyChart(dailyData) {
+        const today = new Date();
+        const last30Days = [];
+        
+        for (let i = 29; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            last30Days.push({
+                date: dateStr,
+                clicks: dailyData[dateStr] || 0,
+                label: date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+            });
+        }
+        
+        const maxClicks = Math.max(...last30Days.map(d => d.clicks));
+        
+        return last30Days.map(day => {
+            const percentage = maxClicks > 0 ? (day.clicks / maxClicks) * 100 : 0;
+            return `
+                <div class="day-bar" title="${day.label} - ${day.clicks} кликов">
+                    <div class="day-fill" style="height: ${Math.max(percentage, 2)}%"></div>
+                    <span class="day-label">${day.label}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Recent clicks with enhanced details
+    const recentClicksHtml = analytics.recentClicks
+        .map(click => {
+            const clickDate = new Date(click.clicked_at);
+            const timeAgo = getTimeAgo(clickDate);
+            let refererDisplay = 'Прямой переход';
+            if (click.referer && click.referer !== '') {
+                try {
+                    refererDisplay = new URL(click.referer).hostname.replace('www.', '');
+                } catch (e) {
+                    refererDisplay = 'Неизвестный источник';
+                }
+            }
+            
+            return `
+                <div class="click-item-detailed">
+                    <div class="click-main">
+                        <div class="click-location">
+                            <i class="fas fa-map-marker-alt"></i>
+                            ${click.country}${click.region !== 'Неизвестно' ? `, ${click.region}` : ''}${click.city !== 'Неизвестно' ? `, ${click.city}` : ''}
+                        </div>
+                        <div class="click-tech">
+                            <span><i class="fas fa-globe"></i> ${click.browser}</span>
+                            <span><i class="fas fa-desktop"></i> ${click.os}</span>
+                            <span><i class="fas fa-mobile-alt"></i> ${click.device_type}</span>
+                        </div>
+                        <div class="click-source">
+                            <i class="fas fa-external-link-alt"></i>
+                            Источник: ${refererDisplay}
+                        </div>
+                        <div class="click-ip">
+                            <i class="fas fa-network-wired"></i>
+                            IP: ${click.ip_address}
+                        </div>
+                    </div>
+                    <div class="click-time">
+                        <i class="fas fa-clock"></i>
+                        ${timeAgo}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
     document.getElementById('analyticsContent').innerHTML = `
-        <div style="margin-bottom: 20px;">
-            <h3 style="margin-bottom: 10px;">Аналитика для: <a href="${shortUrl}" target="_blank">${shortUrl}</a></h3>
-            <p style="color: #666; word-break: break-all;">→ ${url.original_url}</p>
+        <div class="analytics-header">
+            <h3>Аналитика для: <a href="${shortUrl}" target="_blank">${shortUrl}</a></h3>
+            <p class="original-url">→ ${url.original_url}</p>
             ${url.tags && url.tags.length > 0 ? `
-                <div style="margin-top: 10px;">
+                <div class="tags-container">
                     ${url.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
                 </div>
             ` : ''}
-        </div>
-        
-        <div class="analytics-grid">
-            <div class="analytics-card">
-                <h4>Общая статистика</h4>
-                <div class="stat-number">${analytics.totalClicks}</div>
-                <p>Всего кликов</p>
-            </div>
-            
-            <div class="analytics-card">
-                <h4>Топ страны</h4>
-                <ul class="country-list">${countriesList || '<li>Нет данных</li>'}</ul>
-            </div>
-            
-            <div class="analytics-card">
-                <h4>Браузеры</h4>
-                <ul class="country-list">${browsersList || '<li>Нет данных</li>'}</ul>
-            </div>
-            
-            <div class="analytics-card">
-                <h4>Устройства</h4>
-                <ul class="country-list">${devicesList || '<li>Нет данных</li>'}</ul>
-            </div>
-            
-            <div class="analytics-card">
-                <h4>Операционные системы</h4>
-                <ul class="country-list">${osList || '<li>Нет данных</li>'}</ul>
+            <div class="url-created">
+                <i class="fas fa-calendar-plus"></i>
+                Создана: ${new Date(url.created_at).toLocaleDateString('ru-RU', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                })}
             </div>
         </div>
-        
+
+        <!-- Summary Stats -->
+        <div class="summary-stats">
+            <div class="summary-card">
+                <div class="summary-icon"><i class="fas fa-mouse-pointer"></i></div>
+                <div class="summary-content">
+                    <div class="summary-number">${analytics.summary.totalClicks}</div>
+                    <div class="summary-label">Всего кликов</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon"><i class="fas fa-users"></i></div>
+                <div class="summary-content">
+                    <div class="summary-number">${analytics.summary.uniqueVisitors}</div>
+                    <div class="summary-label">Уникальных посетителей</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon"><i class="fas fa-calendar-day"></i></div>
+                <div class="summary-content">
+                    <div class="summary-number">${analytics.summary.clicksLast24h}</div>
+                    <div class="summary-label">За последние 24ч</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon"><i class="fas fa-calendar-week"></i></div>
+                <div class="summary-content">
+                    <div class="summary-number">${analytics.summary.clicksLast7days}</div>
+                    <div class="summary-label">За последние 7 дней</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon"><i class="fas fa-chart-line"></i></div>
+                <div class="summary-content">
+                    <div class="summary-number">${analytics.summary.avgClicksPerDay}</div>
+                    <div class="summary-label">Среднее в день</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon"><i class="fas fa-clock"></i></div>
+                <div class="summary-content">
+                    <div class="summary-number-small">${analytics.summary.peakHour}</div>
+                    <div class="summary-label">Пиковый час</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-section">
+            <div class="chart-container">
+                <h4><i class="fas fa-chart-bar"></i> Активность по часам (последние 7 дней)</h4>
+                <div class="hourly-chart">
+                    ${createHourlyChart(analytics.traffic.hourlyClicks)}
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h4><i class="fas fa-chart-area"></i> Активность по дням (последние 30 дней)</h4>
+                <div class="daily-chart">
+                    ${createDailyChart(analytics.traffic.dailyClicks)}
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Analytics Grid -->
+        <div class="analytics-grid-detailed">
+            <div class="analytics-card-detailed">
+                <h4><i class="fas fa-globe-americas"></i> География</h4>
+                <div class="analytics-tabs">
+                    <button class="tab-btn active" onclick="switchTab(this, 'countries')">Страны</button>
+                    <button class="tab-btn" onclick="switchTab(this, 'cities')">Города</button>
+                </div>
+                <div class="tab-content active" id="countries">
+                    <ul class="stats-list">${createStatsList(analytics.geographic.countries, 10)}</ul>
+                </div>
+                <div class="tab-content" id="cities">
+                    <ul class="stats-list">${createStatsList(analytics.geographic.cities, 10)}</ul>
+                </div>
+            </div>
+            
+            <div class="analytics-card-detailed">
+                <h4><i class="fas fa-desktop"></i> Технологии</h4>
+                <div class="analytics-tabs">
+                    <button class="tab-btn active" onclick="switchTab(this, 'browsers')">Браузеры</button>
+                    <button class="tab-btn" onclick="switchTab(this, 'devices')">Устройства</button>
+                    <button class="tab-btn" onclick="switchTab(this, 'os')">ОС</button>
+                </div>
+                <div class="tab-content active" id="browsers">
+                    <ul class="stats-list">${createStatsList(analytics.technology.browsers)}</ul>
+                </div>
+                <div class="tab-content" id="devices">
+                    <ul class="stats-list">${createStatsList(analytics.technology.devices)}</ul>
+                </div>
+                <div class="tab-content" id="os">
+                    <ul class="stats-list">${createStatsList(analytics.technology.operatingSystems)}</ul>
+                </div>
+            </div>
+            
+            <div class="analytics-card-detailed">
+                <h4><i class="fas fa-external-link-alt"></i> Источники трафика</h4>
+                <ul class="stats-list">${createStatsList(analytics.traffic.referers, 15)}</ul>
+            </div>
+            
+            <div class="analytics-card-detailed">
+                <h4><i class="fas fa-calendar-alt"></i> По дням недели</h4>
+                <ul class="stats-list">${createStatsList(analytics.traffic.weeklyClicks, 7, false)}</ul>
+            </div>
+        </div>
+
         ${analytics.recentClicks.length > 0 ? `
-            <div class="recent-clicks">
-                <h4>Последние переходы</h4>
-                ${recentClicksHtml}
+            <div class="recent-clicks-detailed">
+                <h4><i class="fas fa-history"></i> Последние переходы</h4>
+                <div class="clicks-list">
+                    ${recentClicksHtml}
+                </div>
             </div>
         ` : ''}
+        
+        <div class="analytics-footer">
+            <button class="btn btn-secondary" onclick="closeAnalytics()">
+                <i class="fas fa-times"></i> Закрыть аналитику
+            </button>
+            <button class="btn btn-primary" onclick="exportAnalytics('${url.short_code}')">
+                <i class="fas fa-download"></i> Экспорт данных
+            </button>
+        </div>
     `;
+}
+
+// Switch tabs in analytics
+function switchTab(button, tabId) {
+    // Remove active class from all tabs in the same container
+    const container = button.closest('.analytics-card-detailed');
+    container.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    container.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    // Add active class to clicked button and corresponding content
+    button.classList.add('active');
+    container.querySelector(`#${tabId}`).classList.add('active');
+}
+
+// Close analytics
+function closeAnalytics() {
+    analyticsSection.classList.add('hidden');
+}
+
+// Export analytics data
+function exportAnalytics(shortCode) {
+    // This could be enhanced to actually export data as CSV/JSON
+    showToast('Экспорт данных будет добавлен в следующей версии', 'info');
 }
 
 // Helper function to get time ago
