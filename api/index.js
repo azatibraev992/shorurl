@@ -577,6 +577,57 @@ app.get('/api/analytics/:shortCode', async (req, res) => {
     const createdAt = new Date(urlData.created_at || new Date());
     const avgClicksPerDay = totalClicks > 0 ? (totalClicks / Math.max(1, Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)))) : 0;
 
+    // Additional analytics
+    const topCountries = Object.entries(countries).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topBrowsers = Object.entries(browsers).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topDevices = Object.entries(devices).sort((a, b) => b[1] - a[1]);
+    const topReferers = Object.entries(referers).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+    // CTR analysis by hour
+    const hourlyClickRate = {};
+    const totalHourlyClicks = Object.values(hourlyClicks).reduce((sum, count) => sum + count, 0);
+    Object.entries(hourlyClicks).forEach(([hour, count]) => {
+      hourlyClickRate[hour] = totalHourlyClicks > 0 ? ((count / totalHourlyClicks) * 100).toFixed(2) : 0;
+    });
+
+    // Growth trends
+    const daysArray = Object.entries(dailyClicks).sort((a, b) => new Date(a[0]) - new Date(b[0]));
+    let growthTrend = 'stable';
+    if (daysArray.length >= 2) {
+      const recent7Days = daysArray.slice(-7);
+      const previous7Days = daysArray.slice(-14, -7);
+      const recentAvg = recent7Days.reduce((sum, [_, count]) => sum + count, 0) / recent7Days.length;
+      const previousAvg = previous7Days.length > 0 ? previous7Days.reduce((sum, [_, count]) => sum + count, 0) / previous7Days.length : 0;
+      
+      if (recentAvg > previousAvg * 1.1) growthTrend = 'growing';
+      else if (recentAvg < previousAvg * 0.9) growthTrend = 'declining';
+    }
+
+    // Device category analysis
+    const mobileClicks = clicks.filter(click => click.device_type === 'Mobile').length;
+    const desktopClicks = clicks.filter(click => click.device_type === 'Desktop').length;
+    const tabletClicks = clicks.filter(click => click.device_type === 'Tablet').length;
+    const mobileShare = totalClicks > 0 ? ((mobileClicks / totalClicks) * 100).toFixed(1) : 0;
+    const desktopShare = totalClicks > 0 ? ((desktopClicks / totalClicks) * 100).toFixed(1) : 0;
+
+    // Time of day analysis
+    const morningClicks = clicks.filter(click => {
+      const hour = new Date(click.clicked_at).getHours();
+      return hour >= 6 && hour < 12;
+    }).length;
+    const afternoonClicks = clicks.filter(click => {
+      const hour = new Date(click.clicked_at).getHours();
+      return hour >= 12 && hour < 18;
+    }).length;
+    const eveningClicks = clicks.filter(click => {
+      const hour = new Date(click.clicked_at).getHours();
+      return hour >= 18 && hour < 24;
+    }).length;
+    const nightClicks = clicks.filter(click => {
+      const hour = new Date(click.clicked_at).getHours();
+      return hour >= 0 && hour < 6;
+    }).length;
+
     res.json({
       url: {
         original_url: urlData.original_url,
@@ -593,7 +644,28 @@ app.get('/api/analytics/:shortCode', async (req, res) => {
           clicksLast30days,
           avgClicksPerDay: Math.round(avgClicksPerDay * 100) / 100,
           peakHour: peakHour ? `${peakHour[0]}:00 (${peakHour[1]} кликов)` : 'Нет данных',
-          peakDay: peakDay ? `${peakDay[0]} (${peakDay[1]} кликов)` : 'Нет данных'
+          peakDay: peakDay ? `${peakDay[0]} (${peakDay[1]} кликов)` : 'Нет данных',
+          growthTrend,
+          mobileShare: parseFloat(mobileShare),
+          desktopShare: parseFloat(desktopShare)
+        },
+        insights: {
+          topCountries,
+          topBrowsers,
+          topDevices,
+          topReferers,
+          hourlyClickRate,
+          timeOfDay: {
+            morning: morningClicks,
+            afternoon: afternoonClicks,
+            evening: eveningClicks,
+            night: nightClicks
+          },
+          deviceBreakdown: {
+            mobile: mobileClicks,
+            desktop: desktopClicks,
+            tablet: tabletClicks
+          }
         },
         geographic: {
           countries,

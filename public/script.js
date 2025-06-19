@@ -534,6 +534,74 @@ function displayAnalytics(data) {
                     <div class="summary-label">Пиковый час</div>
                 </div>
             </div>
+            <div class="summary-card">
+                <div class="summary-icon"><i class="fas fa-${analytics.summary.growthTrend === 'growing' ? 'arrow-trend-up' : analytics.summary.growthTrend === 'declining' ? 'arrow-trend-down' : 'minus'}"></i></div>
+                <div class="summary-content">
+                    <div class="summary-number-small">${analytics.summary.growthTrend === 'growing' ? '📈 Рост' : analytics.summary.growthTrend === 'declining' ? '📉 Спад' : '➡️ Стабильно'}</div>
+                    <div class="summary-label">Тренд за 7 дней</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon"><i class="fas fa-mobile-alt"></i></div>
+                <div class="summary-content">
+                    <div class="summary-number">${analytics.summary.mobileShare}%</div>
+                    <div class="summary-label">Мобильный трафик</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Insights Section -->
+        <div class="insights-section">
+            <h4><i class="fas fa-lightbulb"></i> Дополнительная аналитика</h4>
+            <div class="insights-grid">
+                <div class="insight-card">
+                    <h5><i class="fas fa-sun"></i> Активность по времени суток</h5>
+                    <div class="time-breakdown">
+                        <div class="time-item">
+                            <span class="time-icon">🌅</span>
+                            <span class="time-label">Утро</span>
+                            <span class="time-value">${analytics.insights.timeOfDay.morning} (${((analytics.insights.timeOfDay.morning / analytics.summary.totalClicks) * 100).toFixed(1)}%)</span>
+                        </div>
+                        <div class="time-item">
+                            <span class="time-icon">☀️</span>
+                            <span class="time-label">День</span>
+                            <span class="time-value">${analytics.insights.timeOfDay.afternoon} (${((analytics.insights.timeOfDay.afternoon / analytics.summary.totalClicks) * 100).toFixed(1)}%)</span>
+                        </div>
+                        <div class="time-item">
+                            <span class="time-icon">🌆</span>
+                            <span class="time-label">Вечер</span>
+                            <span class="time-value">${analytics.insights.timeOfDay.evening} (${((analytics.insights.timeOfDay.evening / analytics.summary.totalClicks) * 100).toFixed(1)}%)</span>
+                        </div>
+                        <div class="time-item">
+                            <span class="time-icon">🌙</span>
+                            <span class="time-label">Ночь</span>
+                            <span class="time-value">${analytics.insights.timeOfDay.night} (${((analytics.insights.timeOfDay.night / analytics.summary.totalClicks) * 100).toFixed(1)}%)</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="insight-card">
+                    <h5><i class="fas fa-medal"></i> Топ показатели</h5>
+                    <div class="top-metrics">
+                        <div class="metric-row">
+                            <span class="metric-label">🏆 Лучшая страна:</span>
+                            <span class="metric-value">${analytics.insights.topCountries[0] ? analytics.insights.topCountries[0][0] + ' (' + analytics.insights.topCountries[0][1] + ')' : 'Нет данных'}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">🌐 Лучший браузер:</span>
+                            <span class="metric-value">${analytics.insights.topBrowsers[0] ? analytics.insights.topBrowsers[0][0] + ' (' + analytics.insights.topBrowsers[0][1] + ')' : 'Нет данных'}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">📱 Лучшее устройство:</span>
+                            <span class="metric-value">${analytics.insights.topDevices[0] ? analytics.insights.topDevices[0][0] + ' (' + analytics.insights.topDevices[0][1] + ')' : 'Нет данных'}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">🔗 Топ источник:</span>
+                            <span class="metric-value">${analytics.insights.topReferers[0] ? analytics.insights.topReferers[0][0] + ' (' + analytics.insights.topReferers[0][1] + ')' : 'Нет данных'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Charts Section -->
@@ -636,9 +704,313 @@ function closeAnalytics() {
 }
 
 // Export analytics data
-function exportAnalytics(shortCode) {
-    // This could be enhanced to actually export data as CSV/JSON
-    showToast('Экспорт данных будет добавлен в следующей версии', 'info');
+async function exportAnalytics(shortCode) {
+    try {
+        showToast('Генерируем PDF отчет...', 'info');
+        
+        // Get analytics data
+        const response = await fetch(`/api/analytics/${shortCode}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Ошибка получения данных');
+        }
+        
+        generatePDFReport(data);
+        showToast('PDF отчет готов!', 'success');
+    } catch (error) {
+        console.error('Export error:', error);
+        showToast('Ошибка при создании отчета', 'error');
+    }
+}
+
+// Generate PDF Report
+function generatePDFReport(data) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    
+    // Colors
+    const primaryColor = [102, 126, 234]; // #667eea
+    const secondaryColor = [118, 75, 162]; // #764ba2
+    const textColor = [51, 51, 51]; // #333
+    const lightGray = [240, 240, 240]; // #f0f0f0
+    
+    let currentY = 20;
+    
+    // Header with gradient background simulation
+    doc.setFillColor(...primaryColor);
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    // Title
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('📊 Аналитический отчет ShorURL', 20, 25);
+    
+    // Subtitle
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Отчет создан: ${new Date().toLocaleDateString('ru-RU', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })}`, 20, 33);
+    
+    currentY = 50;
+    
+    // URL Information
+    doc.setTextColor(...textColor);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('🔗 Информация о ссылке', 20, currentY);
+    currentY += 10;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Короткая ссылка: ${window.location.origin}/${data.url.short_code}`, 20, currentY);
+    currentY += 5;
+    
+    // Handle long URLs
+    const originalUrl = data.url.original_url;
+    if (originalUrl.length > 80) {
+        const lines = doc.splitTextToSize(`Оригинальная ссылка: ${originalUrl}`, 170);
+        doc.text(lines, 20, currentY);
+        currentY += lines.length * 5;
+    } else {
+        doc.text(`Оригинальная ссылка: ${originalUrl}`, 20, currentY);
+        currentY += 5;
+    }
+    
+    doc.text(`Дата создания: ${new Date(data.url.created_at).toLocaleDateString('ru-RU')}`, 20, currentY);
+    currentY += 5;
+    
+    if (data.url.tags && data.url.tags.length > 0) {
+        doc.text(`Теги: ${data.url.tags.join(', ')}`, 20, currentY);
+        currentY += 5;
+    }
+    
+    currentY += 10;
+    
+    // Summary Statistics
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('📈 Сводная статистика', 20, currentY);
+    currentY += 10;
+    
+    const summaryData = [
+        ['Метрика', 'Значение', 'Описание'],
+        ['Всего кликов', data.analytics.summary.totalClicks.toString(), 'Общее количество переходов'],
+        ['Уникальных посетителей', data.analytics.summary.uniqueVisitors.toString(), 'Уникальные IP адреса'],
+        ['За последние 24ч', data.analytics.summary.clicksLast24h.toString(), 'Активность за сутки'],
+        ['За последние 7 дней', data.analytics.summary.clicksLast7days.toString(), 'Недельная активность'],
+        ['За последние 30 дней', data.analytics.summary.clicksLast30days.toString(), 'Месячная активность'],
+        ['Среднее в день', data.analytics.summary.avgClicksPerDay.toString(), 'Средние клики за день'],
+        ['Пиковый час', data.analytics.summary.peakHour, 'Самое активное время'],
+        ['Пиковый день недели', data.analytics.summary.peakDay, 'Самый активный день'],
+        ['Тренд роста', data.analytics.summary.growthTrend === 'growing' ? '📈 Растет' : 
+                        data.analytics.summary.growthTrend === 'declining' ? '📉 Снижается' : '➡️ Стабильно', 'Динамика за последние 7 дней']
+    ];
+    
+    doc.autoTable({
+        startY: currentY,
+        head: [summaryData[0]],
+        body: summaryData.slice(1),
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: lightGray },
+        columnStyles: {
+            0: { fontStyle: 'bold', cellWidth: 50 },
+            1: { cellWidth: 30, halign: 'center' },
+            2: { cellWidth: 90 }
+        }
+    });
+    
+    currentY = doc.lastAutoTable.finalY + 15;
+    
+    // Geographic Analytics
+    if (currentY > 250) { // New page if needed
+        doc.addPage();
+        currentY = 20;
+    }
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('🌍 География посетителей', 20, currentY);
+    currentY += 10;
+    
+    const topCountries = data.analytics.insights.topCountries.slice(0, 10);
+    if (topCountries.length > 0) {
+        const geoData = [['Страна', 'Клики', '% от общего']];
+        const totalClicks = data.analytics.summary.totalClicks;
+        
+        topCountries.forEach(([country, clicks]) => {
+            const percentage = ((clicks / totalClicks) * 100).toFixed(1);
+            geoData.push([country, clicks.toString(), `${percentage}%`]);
+        });
+        
+        doc.autoTable({
+            startY: currentY,
+            head: [geoData[0]],
+            body: geoData.slice(1),
+            theme: 'grid',
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: { fillColor: [220, 53, 69], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: lightGray },
+            columnStyles: {
+                0: { cellWidth: 80 },
+                1: { cellWidth: 30, halign: 'center' },
+                2: { cellWidth: 30, halign: 'center' }
+            }
+        });
+        
+        currentY = doc.lastAutoTable.finalY + 15;
+    }
+    
+    // Technology Analytics
+    if (currentY > 220) {
+        doc.addPage();
+        currentY = 20;
+    }
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('💻 Технологии', 20, currentY);
+    currentY += 10;
+    
+    // Device breakdown
+    const deviceData = data.analytics.insights.deviceBreakdown;
+    const deviceTable = [
+        ['Тип устройства', 'Количество', '% от общего'],
+        ['🖥️ Компьютеры', deviceData.desktop.toString(), `${data.analytics.summary.desktopShare}%`],
+        ['📱 Мобильные', deviceData.mobile.toString(), `${data.analytics.summary.mobileShare}%`],
+        ['📱 Планшеты', deviceData.tablet.toString(), `${(100 - data.analytics.summary.desktopShare - data.analytics.summary.mobileShare).toFixed(1)}%`]
+    ];
+    
+    doc.autoTable({
+        startY: currentY,
+        head: [deviceTable[0]],
+        body: deviceTable.slice(1),
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [40, 167, 69], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: lightGray },
+        columnStyles: {
+            0: { cellWidth: 60 },
+            1: { cellWidth: 40, halign: 'center' },
+            2: { cellWidth: 40, halign: 'center' }
+        }
+    });
+    
+    currentY = doc.lastAutoTable.finalY + 15;
+    
+    // Top Browsers
+    const topBrowsers = data.analytics.insights.topBrowsers.slice(0, 5);
+    if (topBrowsers.length > 0) {
+        const browserData = [['Браузер', 'Клики', '% от общего']];
+        
+        topBrowsers.forEach(([browser, clicks]) => {
+            const percentage = ((clicks / totalClicks) * 100).toFixed(1);
+            browserData.push([browser, clicks.toString(), `${percentage}%`]);
+        });
+        
+        doc.autoTable({
+            startY: currentY,
+            head: [browserData[0]],
+            body: browserData.slice(1),
+            theme: 'grid',
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: { fillColor: [23, 162, 184], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: lightGray }
+        });
+        
+        currentY = doc.lastAutoTable.finalY + 15;
+    }
+    
+    // Time Analysis
+    if (currentY > 220) {
+        doc.addPage();
+        currentY = 20;
+    }
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('⏰ Анализ времени', 20, currentY);
+    currentY += 10;
+    
+    const timeData = data.analytics.insights.timeOfDay;
+    const timeTable = [
+        ['Время суток', 'Клики', '% от общего'],
+        ['🌅 Утро (6:00-12:00)', timeData.morning.toString(), `${((timeData.morning / totalClicks) * 100).toFixed(1)}%`],
+        ['☀️ День (12:00-18:00)', timeData.afternoon.toString(), `${((timeData.afternoon / totalClicks) * 100).toFixed(1)}%`],
+        ['🌆 Вечер (18:00-24:00)', timeData.evening.toString(), `${((timeData.evening / totalClicks) * 100).toFixed(1)}%`],
+        ['🌙 Ночь (0:00-6:00)', timeData.night.toString(), `${((timeData.night / totalClicks) * 100).toFixed(1)}%`]
+    ];
+    
+    doc.autoTable({
+        startY: currentY,
+        head: [timeTable[0]],
+        body: timeTable.slice(1),
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [111, 66, 193], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: lightGray }
+    });
+    
+    currentY = doc.lastAutoTable.finalY + 15;
+    
+    // Traffic Sources
+    if (currentY > 200) {
+        doc.addPage();
+        currentY = 20;
+    }
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('🔗 Источники трафика', 20, currentY);
+    currentY += 10;
+    
+    const topReferers = data.analytics.insights.topReferers.slice(0, 8);
+    if (topReferers.length > 0) {
+        const refererData = [['Источник', 'Переходы', '% от общего']];
+        
+        topReferers.forEach(([referer, clicks]) => {
+            const percentage = ((clicks / totalClicks) * 100).toFixed(1);
+            const displayReferer = referer.length > 30 ? referer.substring(0, 30) + '...' : referer;
+            refererData.push([displayReferer, clicks.toString(), `${percentage}%`]);
+        });
+        
+        doc.autoTable({
+            startY: currentY,
+            head: [refererData[0]],
+            body: refererData.slice(1),
+            theme: 'grid',
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: { fillColor: [255, 193, 7], textColor: 0, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: lightGray },
+            columnStyles: {
+                0: { cellWidth: 90 },
+                1: { cellWidth: 30, halign: 'center' },
+                2: { cellWidth: 30, halign: 'center' }
+            }
+        });
+    }
+    
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(`Страница ${i} из ${pageCount}`, 20, 290);
+        doc.text('Создано с помощью ShorURL Analytics', 150, 290);
+    }
+    
+    // Save the PDF
+    const fileName = `ShorURL_Analytics_${data.url.short_code}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
 }
 
 // Helper function to get time ago

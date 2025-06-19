@@ -1102,4 +1102,170 @@ header p {
     .hour-label {
         font-size: 0.6em;
     }
+}
+
+/* Additional Insights Section */
+.insights-section {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.insights-section h4 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 1.2em;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.insights-section h4 i {
+    margin-right: 8px;
+    color: #ffc107;
+}
+
+.insights-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.insight-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    border-left: 4px solid #667eea;
+}
+
+.insight-card h5 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.insight-card h5 i {
+    margin-right: 8px;
+    color: #667eea;
+}
+
+/* Time Breakdown */
+.time-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.time-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: white;
+    padding: 10px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.time-icon {
+    font-size: 1.2em;
+    width: 30px;
+    text-align: center;
+}
+
+.time-label {
+    flex: 1;
+    font-weight: 500;
+    color: #333;
+}
+
+.time-value {
+    font-weight: bold;
+    color: #667eea;
+    font-size: 0.9em;
+}
+
+/* Top Metrics */
+.top-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 10px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.metric-label {
+    font-weight: 500;
+    color: #333;
+    font-size: 0.9em;
+}
+
+.metric-value {
+    font-weight: bold;
+    color: #28a745;
+    font-size: 0.9em;
+    max-width: 120px;
+    text-align: right;
+    word-break: break-word;
+}
+
+/* Enhanced Summary Cards */
+.summary-stats {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+/* Responsive Design Updates */
+@media (max-width: 768px) {
+    .insights-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .insight-card {
+        padding: 12px;
+    }
+    
+    .time-item, .metric-row {
+        padding: 8px;
+        font-size: 0.9em;
+    }
+    
+    .metric-value {
+        max-width: 100px;
+        font-size: 0.8em;
+    }
+    
+    .summary-stats {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .summary-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .time-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 5px;
+    }
+    
+    .metric-row {
+        flex-direction: column;
+        gap: 5px;
+        text-align: center;
+    }
+    
+    .metric-value {
+        max-width: none;
+    }
 } 
