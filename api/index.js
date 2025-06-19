@@ -518,7 +518,7 @@ app.get('/api/analytics/:shortCode', async (req, res) => {
     const weeklyClicks = {};
     const referers = {};
     const uniqueIPs = new Set();
-    const recentClicks = clicks.slice(0, 20);
+    const recentClicks = clicks.slice(0, 100); // Увеличиваем лимит до 100 для основного запроса
 
     // Calculate time-based analytics
     const now = new Date();

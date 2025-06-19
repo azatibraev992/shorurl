@@ -923,10 +923,10 @@ async function exportAnalytics(shortCode) {
 // Generate PDF Report
 function generatePDFReport(data) {
     try {
-        console.log('Начинаем генерацию PDF...', data);
+        console.log('Starting PDF generation...', data);
         
         if (!window.jspdf) {
-            throw new Error('jsPDF библиотека не загружена');
+            throw new Error('jsPDF library not loaded');
         }
         
         const { jsPDF } = window.jspdf;
@@ -948,12 +948,12 @@ function generatePDFReport(data) {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.text('📊 Аналитический отчет ShorURL', 20, 25);
+    doc.text('ShorURL Analytics Report', 20, 25);
     
     // Subtitle
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Отчет создан: ${new Date().toLocaleDateString('ru-RU', { 
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric',
@@ -967,30 +967,30 @@ function generatePDFReport(data) {
     doc.setTextColor(...textColor);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('🔗 Информация о ссылке', 20, currentY);
+    doc.text('Link Information', 20, currentY);
     currentY += 10;
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Короткая ссылка: ${window.location.origin}/${data.url.short_code}`, 20, currentY);
+    doc.text(`Short URL: ${window.location.origin}/${data.url.short_code}`, 20, currentY);
     currentY += 5;
     
     // Handle long URLs
     const originalUrl = data.url.original_url;
     if (originalUrl.length > 80) {
-        const lines = doc.splitTextToSize(`Оригинальная ссылка: ${originalUrl}`, 170);
+        const lines = doc.splitTextToSize(`Original URL: ${originalUrl}`, 170);
         doc.text(lines, 20, currentY);
         currentY += lines.length * 5;
     } else {
-        doc.text(`Оригинальная ссылка: ${originalUrl}`, 20, currentY);
+        doc.text(`Original URL: ${originalUrl}`, 20, currentY);
         currentY += 5;
     }
     
-    doc.text(`Дата создания: ${new Date(data.url.created_at).toLocaleDateString('ru-RU')}`, 20, currentY);
+    doc.text(`Created: ${new Date(data.url.created_at).toLocaleDateString('en-US')}`, 20, currentY);
     currentY += 5;
     
     if (data.url.tags && data.url.tags.length > 0) {
-        doc.text(`Теги: ${data.url.tags.join(', ')}`, 20, currentY);
+        doc.text(`Tags: ${data.url.tags.join(', ')}`, 20, currentY);
         currentY += 5;
     }
     
@@ -999,21 +999,21 @@ function generatePDFReport(data) {
     // Summary Statistics
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('📈 Сводная статистика', 20, currentY);
+    doc.text('Summary Statistics', 20, currentY);
     currentY += 10;
     
     const summaryData = [
-        ['Метрика', 'Значение', 'Описание'],
-        ['Всего кликов', data.analytics.summary.totalClicks.toString(), 'Общее количество переходов'],
-        ['Уникальных посетителей', data.analytics.summary.uniqueVisitors.toString(), 'Уникальные IP адреса'],
-        ['За последние 24ч', data.analytics.summary.clicksLast24h.toString(), 'Активность за сутки'],
-        ['За последние 7 дней', data.analytics.summary.clicksLast7days.toString(), 'Недельная активность'],
-        ['За последние 30 дней', data.analytics.summary.clicksLast30days.toString(), 'Месячная активность'],
-        ['Среднее в день', data.analytics.summary.avgClicksPerDay.toString(), 'Средние клики за день'],
-        ['Пиковый час', data.analytics.summary.peakHour, 'Самое активное время'],
-        ['Пиковый день недели', data.analytics.summary.peakDay, 'Самый активный день'],
-        ['Тренд роста', data.analytics.summary.growthTrend === 'growing' ? '📈 Растет' : 
-                        data.analytics.summary.growthTrend === 'declining' ? '📉 Снижается' : '➡️ Стабильно', 'Динамика за последние 7 дней']
+        ['Metric', 'Value', 'Description'],
+        ['Total Clicks', data.analytics.summary.totalClicks.toString(), 'Total number of visits'],
+        ['Unique Visitors', data.analytics.summary.uniqueVisitors.toString(), 'Unique IP addresses'],
+        ['Last 24 hours', data.analytics.summary.clicksLast24h.toString(), 'Daily activity'],
+        ['Last 7 days', data.analytics.summary.clicksLast7days.toString(), 'Weekly activity'],
+        ['Last 30 days', data.analytics.summary.clicksLast30days.toString(), 'Monthly activity'],
+        ['Average per day', data.analytics.summary.avgClicksPerDay.toString(), 'Average clicks per day'],
+        ['Peak hour', data.analytics.summary.peakHour, 'Most active time'],
+        ['Peak day', data.analytics.summary.peakDay, 'Most active day'],
+        ['Growth trend', data.analytics.summary.growthTrend === 'growing' ? 'Growing' : 
+                        data.analytics.summary.growthTrend === 'declining' ? 'Declining' : 'Stable', 'Last 7 days dynamics']
     ];
     
     doc.autoTable({
@@ -1041,12 +1041,12 @@ function generatePDFReport(data) {
     
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('🌍 География посетителей', 20, currentY);
+    doc.text('Visitor Geography', 20, currentY);
     currentY += 10;
     
     const topCountries = data.analytics.insights.topCountries.slice(0, 10);
     if (topCountries.length > 0) {
-        const geoData = [['Страна', 'Клики', '% от общего']];
+        const geoData = [['Country', 'Clicks', '% of Total']];
         const totalClicks = data.analytics.summary.totalClicks;
         
         topCountries.forEach(([country, clicks]) => {
@@ -1080,24 +1080,24 @@ function generatePDFReport(data) {
     
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('💻 Технологии', 20, currentY);
+    doc.text('Technology Breakdown', 20, currentY);
     currentY += 10;
     
     // Device breakdown
     const deviceData = data.analytics.technology.devices || {};
-    const totalClicks = data.analytics.summary.totalClicks;
+    const totalClicksForDevices = data.analytics.summary.totalClicks;
     const mobileClicks = deviceData['Mobile'] || 0;
     const desktopClicks = deviceData['Desktop'] || 0;
     const tabletClicks = deviceData['Tablet'] || 0;
-    const mobileShare = totalClicks > 0 ? ((mobileClicks / totalClicks) * 100).toFixed(1) : 0;
-    const desktopShare = totalClicks > 0 ? ((desktopClicks / totalClicks) * 100).toFixed(1) : 0;
-    const tabletShare = totalClicks > 0 ? ((tabletClicks / totalClicks) * 100).toFixed(1) : 0;
+    const mobileShare = totalClicksForDevices > 0 ? ((mobileClicks / totalClicksForDevices) * 100).toFixed(1) : 0;
+    const desktopShare = totalClicksForDevices > 0 ? ((desktopClicks / totalClicksForDevices) * 100).toFixed(1) : 0;
+    const tabletShare = totalClicksForDevices > 0 ? ((tabletClicks / totalClicksForDevices) * 100).toFixed(1) : 0;
     
     const deviceTable = [
-        ['Тип устройства', 'Количество', '% от общего'],
-        ['🖥️ Компьютеры', desktopClicks.toString(), `${desktopShare}%`],
-        ['📱 Мобильные', mobileClicks.toString(), `${mobileShare}%`],
-        ['📱 Планшеты', tabletClicks.toString(), `${tabletShare}%`]
+        ['Device Type', 'Count', '% of Total'],
+        ['Desktop', desktopClicks.toString(), `${desktopShare}%`],
+        ['Mobile', mobileClicks.toString(), `${mobileShare}%`],
+        ['Tablet', tabletClicks.toString(), `${tabletShare}%`]
     ];
     
     doc.autoTable({
@@ -1120,10 +1120,10 @@ function generatePDFReport(data) {
     // Top Browsers
     const topBrowsers = data.analytics.insights.topBrowsers.slice(0, 5);
     if (topBrowsers.length > 0) {
-        const browserData = [['Браузер', 'Клики', '% от общего']];
+        const browserData = [['Browser', 'Clicks', '% of Total']];
         
         topBrowsers.forEach(([browser, clicks]) => {
-            const percentage = ((clicks / totalClicks) * 100).toFixed(1);
+            const percentage = ((clicks / totalClicksForDevices) * 100).toFixed(1);
             browserData.push([browser, clicks.toString(), `${percentage}%`]);
         });
         
@@ -1148,16 +1148,17 @@ function generatePDFReport(data) {
     
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('⏰ Анализ времени', 20, currentY);
+    doc.text('Time Analysis', 20, currentY);
     currentY += 10;
     
     const timeData = data.analytics.insights.timeOfDay;
+    const totalClicksTime = data.analytics.summary.totalClicks;
     const timeTable = [
-        ['Время суток', 'Клики', '% от общего'],
-        ['🌅 Утро (6:00-12:00)', timeData.morning.toString(), `${((timeData.morning / totalClicks) * 100).toFixed(1)}%`],
-        ['☀️ День (12:00-18:00)', timeData.afternoon.toString(), `${((timeData.afternoon / totalClicks) * 100).toFixed(1)}%`],
-        ['🌆 Вечер (18:00-24:00)', timeData.evening.toString(), `${((timeData.evening / totalClicks) * 100).toFixed(1)}%`],
-        ['🌙 Ночь (0:00-6:00)', timeData.night.toString(), `${((timeData.night / totalClicks) * 100).toFixed(1)}%`]
+        ['Time of Day', 'Clicks', '% of Total'],
+        ['Morning (6:00-12:00)', timeData.morning.toString(), `${((timeData.morning / totalClicksTime) * 100).toFixed(1)}%`],
+        ['Afternoon (12:00-18:00)', timeData.afternoon.toString(), `${((timeData.afternoon / totalClicksTime) * 100).toFixed(1)}%`],
+        ['Evening (18:00-24:00)', timeData.evening.toString(), `${((timeData.evening / totalClicksTime) * 100).toFixed(1)}%`],
+        ['Night (0:00-6:00)', timeData.night.toString(), `${((timeData.night / totalClicksTime) * 100).toFixed(1)}%`]
     ];
     
     doc.autoTable({
@@ -1180,15 +1181,16 @@ function generatePDFReport(data) {
     
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('🔗 Источники трафика', 20, currentY);
+    doc.text('Traffic Sources', 20, currentY);
     currentY += 10;
     
     const topReferers = data.analytics.insights.topReferers.slice(0, 8);
     if (topReferers.length > 0) {
-        const refererData = [['Источник', 'Переходы', '% от общего']];
+        const refererData = [['Source', 'Visits', '% of Total']];
+        const totalClicksReferrer = data.analytics.summary.totalClicks;
         
         topReferers.forEach(([referer, clicks]) => {
-            const percentage = ((clicks / totalClicks) * 100).toFixed(1);
+            const percentage = ((clicks / totalClicksReferrer) * 100).toFixed(1);
             const displayReferer = referer.length > 30 ? referer.substring(0, 30) + '...' : referer;
             refererData.push([displayReferer, clicks.toString(), `${percentage}%`]);
         });
@@ -1215,19 +1217,19 @@ function generatePDFReport(data) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(128, 128, 128);
-        doc.text(`Страница ${i} из ${pageCount}`, 20, 290);
-        doc.text('Создано с помощью ShorURL Analytics', 150, 290);
+        doc.text(`Page ${i} of ${pageCount}`, 20, 290);
+        doc.text('Generated by ShorURL Analytics', 150, 290);
     }
     
     // Save the PDF
     const fileName = `ShorURL_Analytics_${data.url.short_code}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
     
-    console.log('PDF успешно создан:', fileName);
+    console.log('PDF successfully created:', fileName);
     
     } catch (error) {
-        console.error('Ошибка при создании PDF:', error);
-        showToast('Ошибка при создании PDF отчета: ' + error.message, 'error');
+        console.error('Error creating PDF:', error);
+        showToast('Error creating PDF report: ' + error.message, 'error');
     }
 }
 
